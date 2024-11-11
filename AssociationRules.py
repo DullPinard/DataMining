@@ -175,10 +175,19 @@ class AssociationRulesSolve():
                             # print(i)
                             selected_segs.append(nsk)
 
+                    segs_filtered = [(select, labels, ni, s, c, c_dem) for (select, labels, ni, s, c, c_dem) in segs if s >= self.s_th and c >= self.c_th]
+                    
+                    if not segs_filtered:
+                        self.info += f'  未找到频繁{i+1}项集\n'
+                        break
+
+
                     self.info += f'  频繁{i+1}项集:\n  L{i+1}=' + '{\n'
-                    for select, labels, ni, s, c, c_dem in segs:
-                        if s < self.s_th or c < self.c_th:
-                            continue
+                    
+
+                    for select, labels, ni, s, c, c_dem in segs_filtered:
+                        # if s < self.s_th or c < self.c_th:
+                        #     continue
                         sl_names = [self.heads[ssli] for ssli in select]
                         ssl = np.array([sl_names, ['=' for ssli in range(len(select))], labels]).T.tolist()
                         for i in range(len(ssl)):
