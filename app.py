@@ -18,7 +18,9 @@ update_str = \
 二、优化了数据读取获得列的方式，添加了统计列关键字的设置。
 三、支持关联规则生成的范围设置，可以添加不同变量的范围从而更加便捷。
 四、优化了连续两次计算判定树结果相同的bug
-
+**v1.3版本更新内容如下：**
+一、修复了计算强关联规则时对于计算上一阶阈值都不满足要求的时候下一阶还会输出强关联规则。
+二、添加了示例数据的读取。
 python写的exe打包都比较大，请见谅=`~`=
 """
 
@@ -61,11 +63,13 @@ class MainWindow(QWidget):
         self.load_data_button = QPushButton("读取数据")
         self.calculate_button1 = QPushButton("开始计算\n（强关联规则）")
         self.calculate_button2 = QPushButton("开始计算\n（判定树）")
+        self.example_button = QPushButton("示例数据")
         self.help_button = QPushButton("帮助")
         self.load_data_button.clicked.connect(self.load_data)
         self.calculate_button1.clicked.connect(self.calculate1)
         self.calculate_button2.clicked.connect(self.calculate2)
         self.help_button.clicked.connect(self.help)
+        self.example_button.clicked.connect(self.load_example)
         # self.dropdown1 = QComboBox()
         self.dropdown2 = QComboBox()
 
@@ -120,7 +124,7 @@ class MainWindow(QWidget):
         left_layout.addWidget(self.dropdown2)
         left_layout.addWidget(self.calculate_button2)
         
-        
+        left_layout.addWidget(self.example_button)
         left_layout.addWidget(self.label5)
 
         
@@ -200,7 +204,7 @@ class MainWindow(QWidget):
         self.count_label = count_label
         txt_now = self.display_textbox1.toPlainText()
         lines = txt_now.splitlines()
-        lines = [s for s in lines if s]
+        lines = [s.strip() for s in lines if s.strip()]
         cols = -1
 
         try:
@@ -510,6 +514,99 @@ class MainWindow(QWidget):
         except:
             self.label_state.setText(f'计算失败，对象未创建！')
             QMessageBox.question(self, '提示', '计算失败，对象未创建！', QMessageBox.Ok, QMessageBox.Ok)
+
+    def load_example(self):
+
+        with open('./data/1_5.csv', 'r', encoding='utf-8') as file:
+            lines = file.read().splitlines()
+
+        lines = [s.strip() for s in lines if s.strip()]
+
+        count_label = 'Count'
+        try:
+            cols = len(lines) // (len(lines) - lines.index(count_label))
+            out_mat = np.array(lines).reshape(cols, -1)
+        except:
+            print(count_label)
+            self.label_state.setText(f'未找到统计数关键字：{count_label}')
+            QMessageBox.question(self, '提示', f'未找到统计数关键字：{count_label}', QMessageBox.Ok, QMessageBox.Ok)
+            return 
+        
+        try:
+            self.SAR = AssociationRulesSolve(cols, data=lines)
+        except:
+            self.label_state.setText(f'数据读取失败！')
+            QMessageBox.question(self, '提示', '数据读取失败！', QMessageBox.Ok, QMessageBox.Ok)
+            return
+        if self.SAR.success:
+            print('创建成功')
+            self.label_state.setText(f'数据读取成功！表格列数：{cols}')
+            
+
+
+        # self.dropdown1.clear()
+        self.dropdown2.clear()
+        for head in self.SAR.heads[:-1]:
+            # self.dropdown1.addItem(head)
+            self.dropdown2.addItem(head)
+        # cols = int(self.input1.text())
+        # s_th = float(self.input2.text())
+        # c_th = float(self.input3.text())
+
+
+        out_mat_str = get_2dlist_print(out_mat.T)
+        self.display_textbox2.setText(out_mat_str)
+        # SAR_deg = float(self.input4.text())
+        # SAR_id = float(self.input5.text())
+        # self.ARS = AssociationRulesSolve(s_th, c_th, SAR_id, SAR_deg)
+        print(lines)
+        # print(self.display_textbox1.toPlainText(), cols, s_th, c_th, SAR_deg, SAR_id)
+
+        self.success = True
+        self.cols = cols
+        self.table_rows = 1
+        # 初始化选中关联规则的表格
+        self.table_widget.setRowCount(cols-1)
+        self.table_widget.setColumnCount(cols-1)
+
+        for i in range(self.table_widget.rowCount()):
+            for j in range(self.table_widget.columnCount()):
+                item = QTableWidgetItem("")
+                self.table_widget.setItem(i, j, item)
+
+        for i in range(self.table_widget.rowCount()):
+            self.table_widget.setRowHeight(i, 10)  # 设置行高为30像素
+        # for j in range(self.table_widget.columnCount()):
+        #     self.table_widget.setColumnWidth(j, 100)  # 设置列宽为100像素
+        # self.table_widget.setHorizontalHeaderLabels([f'P_{i+1}[S, w]' for i in range(cols)])
+        self.table_widget.setHorizontalHeaderLabels([f'' for i in range(cols-1)])
+        self.table_widget.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.table_widget.customContextMenuRequested.connect(self.show_context_menu)
+
+
+        self.input2.setText('0.2')
+        self.input3.setText('0.75')
+        
+        col_notnan = [0, 1, 2, 3]
+        table_head = ['' for i in range(self.cols)]
+        for i, col in enumerate(col_notnan):
+            label_now = f'P_{i+1}[S, w]'
+            if i == len(col_notnan) - 1 and len(col_notnan) > 1:
+                label_now = '=>' + label_now
+            elif i != 0:
+                label_now = '^ ' + label_now 
+                
+            table_head[col] = label_now
+            
+        self.table_widget.setHorizontalHeaderLabels(table_head)
+
+        self.table_widget.item(0, 0).setText('all')
+        self.table_widget.item(0, 1).setText('all')
+        self.table_widget.item(0, 2).setText('Age')
+        self.table_widget.item(0, 3).setText('all')
+
+        QMessageBox.question(self, '提示', f'示例数据导入成功！表格列数：{cols}', QMessageBox.Ok, QMessageBox.Ok)
+
 
 
 if __name__ == "__main__":
